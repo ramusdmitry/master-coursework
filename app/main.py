@@ -28,7 +28,81 @@ app = FastAPI(
 )
 
 
-@app.post("/forward")
+@app.post(
+    "/forward",
+    response_model=Union[schemas.ForwardResponseJSON, schemas.ForwardResponseImage],
+    responses={
+        400: {
+            "description": "Неверный формат запроса",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"error": {"type": "string"}},
+                        "example": {"error": "bad request"}
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Модель не смогла обработать данные",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"error": {"type": "string"}},
+                        "example": {"error": "модель не смогла обработать данные"}
+                    }
+                }
+            }
+        }
+    },
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": {"type": "number"}
+                                },
+                                "description": "Временное окно с фичами (минимум 60 точек)"
+                            },
+                            "asset": {
+                                "type": "string",
+                                "default": "BTC",
+                                "description": "Актив (опционально)"
+                            }
+                        },
+                        "required": ["data"]
+                    },
+                    "example": {
+                        "data": [[1.0, 2.0, 3.0, 4.0, 5.0], [1.1, 2.1, 3.1, 4.1, 5.1]],
+                        "asset": "BTC"
+                    }
+                },
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "image": {
+                                "type": "string",
+                                "format": "binary",
+                                "description": "Изображение для обработки"
+                            }
+                        },
+                        "required": ["image"]
+                    }
+                }
+            },
+            "required": True
+        }
+    }
+)
 async def forward(
     request: Request,
     db: Session = Depends(get_db)
