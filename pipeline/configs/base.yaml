@@ -1,0 +1,37 @@
+project:
+  name: master-coursework
+  tracking:
+    backend: wandb
+    wandb_project: crypto-pipeline
+    wandb_entity: null
+    mode: online
+
+data:
+  input_glob: data/raw/*_1h.csv
+  timestamp_col: timestamp
+  target_col: close
+  test_size: 0.2
+  seed: 42
+
+features:
+  returns_window: 1
+  ma_windows: [5, 10, 20]
+
+models:
+  default_model: autots
+  baseline_model: naive_last_value
+  autots:
+    forecast_length: 24
+    frequency: infer
+    ensemble: simple
+    model_list: superfast
+    max_generations: 3
+    num_validations: 2
+
+evaluation:
+  primary_metric: rmse
+  metrics: [mae, rmse, mape, smape]
+
+artifacts:
+  output_dir: pipeline/artifacts
+  report_dir: pipeline/reports
