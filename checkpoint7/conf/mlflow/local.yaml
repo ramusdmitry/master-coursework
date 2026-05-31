@@ -1,0 +1,17 @@
+# Конфиг MLflow для локального окружения (сервер в Docker)
+# @package _global_.mlflow
+
+# URI сервера MLflow (задаётся и через env MLFLOW_TRACKING_URI)
+tracking_uri: http://localhost:5000
+
+# Название эксперимента в MLflow
+experiment_name: crypto_meta_labeling_cp7
+
+# Имя зарегистрированной модели в Model Registry
+registered_model_name: crypto_meta_labeling
+
+# URI эндпоинта MinIO (S3-compatible)
+s3_endpoint_url: http://localhost:9000
+
+# Тег/алиас для производственной версии модели
+prd_tag: PRD

@@ -1,0 +1,90 @@
+version: "3.9"
+
+# Сервисы: MinIO (S3-совместимое хранилище), minio-init (создание бакета), MLflow (сервер экспериментов).
+# Запуск: docker compose up -d
+# Остановка: docker compose down
+
+services:
+
+  # --------------------------------------------------------------------------
+  # MinIO — объектное хранилище, совместимое с S3-API
+  # Порты: 9000 (API), 9001 (веб-консоль)
+  # --------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: cp7_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # minio-init — одноразовый контейнер: создаёт бакет mlflow-artifacts и завершается
+  # --------------------------------------------------------------------------
+  minio-init:
+    image: minio/mc:latest
+    container_name: cp7_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+        mc mb --ignore-existing local/mlflow-artifacts;
+        echo 'Бакет mlflow-artifacts создан (или уже существует)';
+        exit 0
+      "
+
+  # --------------------------------------------------------------------------
+  # MLflow — сервер отслеживания экспериментов
+  # Backend store: SQLite (простой вариант; для продакшна замените на Postgres)
+  # Artifact store: S3 → MinIO (mlflow-artifacts)
+  # --------------------------------------------------------------------------
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    container_name: cp7_mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Креды MinIO (должны совпадать с AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY для boto3)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      # URI трекинга задаётся через аргументы CLI; переменная ниже — для клиентского кода
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://localhost:5000}
+    volumes:
+      - mlflow-db:/mlflow
+    depends_on:
+      - minio-init
+    command: >
+      mlflow server
+        --backend-store-uri sqlite:////mlflow/mlflow.db
+        --default-artifact-root s3://mlflow-artifacts/
+        --host 0.0.0.0
+        --port 5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  minio-data:
+    driver: local
+  mlflow-db:
+    driver: local

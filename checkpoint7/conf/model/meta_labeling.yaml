@@ -1,0 +1,25 @@
+# Гиперпараметры модели Meta-Labeling (primary SimpleLSTM + secondary GBDT)
+# @package _global_.model
+
+# --- Primary: SimpleLSTM ---
+hidden_size: 64
+num_layers: 1
+dropout: 0.2
+lr: 0.001
+batch_size: 256
+epochs: 30
+patience: 5          # число эпох без улучшения до early stopping
+
+# --- Окно и горизонт ---
+window: 60           # длина входного окна (баров)
+horizon: 15          # горизонт forward-return (баров)
+min_holding: 15      # минимальное удержание позиции (баров)
+
+# --- Издержки ---
+cost_bps: 7          # суммарные издержки (fee + slippage) в базисных пунктах
+
+# --- Secondary: GradientBoostingClassifier ---
+gbdt:
+  n_estimators: 150
+  max_depth: 3
+  learning_rate: 0.05

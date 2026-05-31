@@ -1,0 +1,11 @@
+# Корневой Hydra-конфиг для CP7 (Meta-Labeling, MLflow, MinIO)
+# Используется в src/train.py и src/predict_prd.py через @hydra.main
+
+defaults:
+  - data: default
+  - model: meta_labeling
+  - mlflow: local
+  - _self_
+
+# Глобальный seed для воспроизводимости
+seed: 42

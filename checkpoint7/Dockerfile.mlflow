@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+LABEL description="MLflow-сервер с поддержкой boto3 (MinIO/S3) и psycopg2 (Postgres-backend)"
+
+# Устанавливаем зависимости одним слоем для компактности образа
+RUN pip install --no-cache-dir \
+    mlflow \
+    boto3 \
+    psycopg2-binary
+
+# Рабочая директория для базы данных SQLite
+WORKDIR /mlflow
+
+# Порт MLflow
+EXPOSE 5000

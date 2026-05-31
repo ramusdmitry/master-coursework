@@ -1,0 +1,11 @@
+# Зависимости проекта CP7: MLflow + MinIO/S3 + DL + ML + данные
+mlflow
+torch
+scikit-learn
+pandas==2.3.3
+numpy
+boto3
+hydra-core
+omegaconf
+matplotlib
+pyarrow
