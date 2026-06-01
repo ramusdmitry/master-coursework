@@ -75,14 +75,23 @@ def ensure_dirs():
     Path("data/raw").mkdir(parents=True, exist_ok=True)
     Path("data/tmp").mkdir(parents=True, exist_ok=True)
 
-def fetch_month_zip(symbol: str, interval: str, yyyy_mm: str) -> bytes:
+def fetch_month_zip(symbol: str, interval: str, yyyy_mm: str, retries: int = 4) -> bytes:
     rel = MONTHLY_PATH_TMPL.format(symbol=symbol, interval=interval, yyyy_mm=yyyy_mm)
     url = f"{VISION_BASE}/{rel}"
-    resp = requests.get(url, timeout=60)
-    if resp.status_code == 404:
-        return b""
-    resp.raise_for_status()
-    return resp.content
+    for attempt in range(retries):
+        try:
+            resp = requests.get(url, timeout=60)
+            if resp.status_code == 404:
+                return b""
+            resp.raise_for_status()
+            return resp.content
+        except Exception as e:
+            if attempt == retries - 1:
+                # не глотаем тихо — сигнализируем о реальном сбое (не 404)
+                print(f"  [retry-fail] {yyyy_mm}: {e}", file=sys.stderr)
+                raise
+            time.sleep(1.5 * (attempt + 1))
+    return b""
 
 def parse_month_zip(zbytes: bytes) -> pd.DataFrame:
     import io, zipfile
@@ -126,6 +135,12 @@ def parse_month_zip(zbytes: bytes) -> pd.DataFrame:
                 "low":   pd.to_numeric(df["low"],   errors="coerce"),
                 "close": pd.to_numeric(df["close"], errors="coerce"),
                 "volume":pd.to_numeric(df["volume"],errors="coerce"),
+                # Order-flow поля Binance kline (раньше отбрасывались):
+                # давление агрессивных покупателей/продавцов — экзогенный сигнал.
+                "quote_volume":   pd.to_numeric(df["quote_asset_volume"], errors="coerce"),
+                "trades":         pd.to_numeric(df["trades_count"],       errors="coerce"),
+                "taker_buy_base": pd.to_numeric(df["taker_buy_base"],     errors="coerce"),
+                "taker_buy_quote":pd.to_numeric(df["taker_buy_quote"],    errors="coerce"),
             })
             out = out.dropna(subset=["timestamp"]).sort_values("timestamp")
             # иногда попадаются дубли меток времени — уберём

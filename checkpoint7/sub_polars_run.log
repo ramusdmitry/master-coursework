@@ -1,0 +1,36 @@
+############# BTC 16:36:15 free=22G #############
+BTC 1s: ROC=0.5762 Sh=-685.73 BH=0.02 | train=16,450,559 test=3,525,060 | ресемпл=4.5с обуч=461.4с RAM=16.75ГБ
+BTC 5s: ROC=0.5921 Sh=-394.31 BH=0.06 | train=3,290,111 test=704,964 | ресемпл=2.1с обуч=90.8с RAM=16.75ГБ
+BTC 15s: ROC=0.582 Sh=-61.16 BH=0.08 | train=1,096,703 test=234,948 | ресемпл=1.7с обуч=27.8с RAM=16.75ГБ
+BTC 30s: ROC=0.5617 Sh=-31.94 BH=0.07 | train=548,351 test=117,444 | ресемпл=1.6с обуч=14.8с RAM=16.75ГБ
+[OK] BTC: дописано 4 -> /home/dmitriy/magistracy/cp7work/checkpoint7/sub_polars_results.csv
+## BTC exit=0 ##
+############# ETH 16:47:14 free=22G #############
+ETH 1s: ROC=0.6148 Sh=-521.49 BH=-0.74 | train=16,450,559 test=3,525,060 | ресемпл=4.6с обуч=346.9с RAM=16.75ГБ
+ETH 5s: ROC=0.5735 Sh=-156.64 BH=-0.62 | train=3,290,111 test=704,964 | ресемпл=2.2с обуч=91.2с RAM=16.75ГБ
+ETH 15s: ROC=0.5364 Sh=-90.71 BH=-0.56 | train=1,096,703 test=234,948 | ресемпл=1.7с обуч=27.8с RAM=16.75ГБ
+ETH 30s: ROC=0.5146 Sh=-0.35 BH=-0.58 | train=548,351 test=117,444 | ресемпл=1.6с обуч=5.6с RAM=16.75ГБ
+[OK] ETH: дописано 4 -> /home/dmitriy/magistracy/cp7work/checkpoint7/sub_polars_results.csv
+## ETH exit=0 ##
+############# BNB 16:56:11 free=22G #############
+BNB 1s: ROC=0.615 Sh=-988.49 BH=3.9 | train=16,450,559 test=3,525,060 | ресемпл=4.2с обуч=461.0с RAM=16.75ГБ
+BNB 5s: ROC=0.5853 Sh=-247.67 BH=3.57 | train=3,290,111 test=704,964 | ресемпл=2.1с обуч=68.9с RAM=16.75ГБ
+BNB 15s: ROC=0.5476 Sh=-125.65 BH=3.39 | train=1,096,703 test=234,948 | ресемпл=1.6с обуч=22.6с RAM=16.75ГБ
+BNB 30s: ROC=0.5184 Sh=-2.4 BH=3.36 | train=548,351 test=117,444 | ресемпл=1.6с обуч=5.6с RAM=16.75ГБ
+[OK] BNB: дописано 4 -> /home/dmitriy/magistracy/cp7work/checkpoint7/sub_polars_results.csv
+## BNB exit=0 ##
+############# SOL 17:06:33 free=22G #############
+SOL 1s: ROC=0.5978 Sh=-625.36 BH=1.43 | train=16,450,559 test=3,525,060 | ресемпл=4.6с обуч=461.1с RAM=16.75ГБ
+SOL 5s: ROC=0.5541 Sh=-118.6 BH=1.38 | train=3,290,111 test=704,964 | ресемпл=2.3с обуч=91.4с RAM=16.75ГБ
+SOL 15s: ROC=0.5261 Sh=-11.19 BH=1.4 | train=1,096,703 test=234,948 | ресемпл=1.6с обуч=22.4с RAM=16.75ГБ
+SOL 30s: ROC=0.5133 Sh=-13.71 BH=1.38 | train=548,351 test=117,444 | ресемпл=1.5с обуч=10.5с RAM=16.75ГБ
+[OK] SOL: дописано 4 -> /home/dmitriy/magistracy/cp7work/checkpoint7/sub_polars_results.csv
+## SOL exit=0 ##
+############# XRP 17:17:26 free=22G #############
+XRP 1s: ROC=0.6199 Sh=-757.18 BH=-0.64 | train=16,450,559 test=3,525,060 | ресемпл=3.6с обуч=462.4с RAM=16.65ГБ
+XRP 5s: ROC=0.565 Sh=-76.37 BH=-0.53 | train=3,290,111 test=704,964 | ресемпл=2.8с обуч=91.3с RAM=16.65ГБ
+XRP 15s: ROC=0.5336 Sh=-14.26 BH=-0.48 | train=1,096,703 test=234,948 | ресемпл=1.6с обуч=25.2с RAM=16.65ГБ
+XRP 30s: ROC=0.5134 Sh=-7.94 BH=-0.47 | train=548,351 test=117,444 | ресемпл=1.6с обуч=10.5с RAM=16.65ГБ
+[OK] XRP: дописано 4 -> /home/dmitriy/magistracy/cp7work/checkpoint7/sub_polars_results.csv
+## XRP exit=0 ##
+ALL DONE 17:28:28

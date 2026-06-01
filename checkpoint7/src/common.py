@@ -27,8 +27,10 @@ import math
 import os
 import pickle
 import random
+import socket
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
@@ -92,6 +94,52 @@ def set_seed(seed: int = SEED) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def resolve_tracking_uri(
+    tracking_uri: str,
+    fallback_db: str = "mlflow_local.db",
+    timeout: float = 2.0,
+) -> str:
+    """Возвращает рабочий MLflow tracking URI с graceful-fallback.
+
+    Если tracking_uri указывает на http(s)-сервер и он недоступен (Docker не
+    поднят), переключается на локальный sqlite-бэкенд. Sqlite, в отличие от
+    file-store (./mlruns), поддерживает Model Registry и алиасы — поэтому
+    регистрация модели и тег/алиас PRD продолжают работать без сервера.
+
+    Так CLI-скрипты (src/train.py, src/predict_prd.py) перестают падать с
+    ConnectionError, если MLflow-сервер не запущен (поведение как в ноутбуках,
+    у которых был fallback на ./mlruns).
+
+    Аргументы:
+        tracking_uri -- сконфигурированный URI (например, http://localhost:5000).
+        fallback_db  -- путь к sqlite-файлу для локального fallback.
+        timeout      -- таймаут проверки доступности сервера (сек).
+
+    Возвращает:
+        Рабочий URI: исходный http(s), если сервер отвечает; иначе
+        'sqlite:///<fallback_db>' (абсолютный путь).
+    """
+    parsed = urlparse(tracking_uri)
+    if parsed.scheme not in ("http", "https"):
+        # sqlite/file/прочее — отдаём как есть
+        return tracking_uri
+
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return tracking_uri
+    except OSError:
+        local = (Path.cwd() / fallback_db).resolve()
+        fallback_uri = f"sqlite:///{local}"
+        print(
+            f"[MLflow] Сервер {tracking_uri} недоступен — переключаюсь на "
+            f"локальный бэкенд {fallback_uri} (Registry+PRD поддерживаются). "
+            "Подними Docker (docker compose up -d) для централизованного трекинга."
+        )
+        return fallback_uri
 
 
 # =============================================================================
@@ -159,10 +207,12 @@ def resolve_y_column(df: pd.DataFrame, asset: str, name: str = "y_bin"):
 
 
 class WindowDataset(Dataset):
-    """PyTorch Dataset для скользящих окон временного ряда.
+    """PyTorch Dataset для скользящих окон временного ряда (ленивый).
 
-    Разворачивает массив признаков X в последовательности длиной `window`
-    и сопоставляет каждой последовательности метку y[i] (i >= window).
+    Окно нарезается в __getitem__, а не материализуется заранее — это снимает
+    OOM на полных данных (раньше np.stack всех окон давал ~6-7 ГБ только на
+    train/test). Математически идентично прежней версии: окно [i-window:i] с
+    меткой y[i] для i >= window.
 
     Аргументы:
         X      -- массив признаков (N, n_features).
@@ -172,23 +222,34 @@ class WindowDataset(Dataset):
 
     def __init__(self, X, y, window: int):
         self.window = window
-        self.X = X.astype(np.float32)
-        self.y = y.astype(np.int64)
-        seqs, labs = [], []
-        for i in range(window, len(X)):
-            seqs.append(self.X[i - window:i])
-            labs.append(self.y[i])
-        self.sequences = np.stack(seqs, axis=0)
-        self.labels = np.array(labs, dtype=np.int64)
+        self.X = np.ascontiguousarray(X, dtype=np.float32)
+        self.y = np.asarray(y).astype(np.int64)
+        self.n = max(0, len(self.X) - window)
+        # метки окон: y[window], y[window+1], ... (совместимо со старым .labels)
+        self.labels = self.y[window: window + self.n]
 
     def __len__(self) -> int:
-        return len(self.labels)
+        return self.n
 
     def __getitem__(self, idx):
+        x = self.X[idx: idx + self.window]          # окно [idx, idx+window)
         return (
-            torch.from_numpy(self.sequences[idx]),
-            torch.tensor(self.labels[idx], dtype=torch.long),
+            torch.from_numpy(x),
+            torch.tensor(self.y[idx + self.window], dtype=torch.long),
         )
+
+    def __getitems__(self, indices):
+        """Батчевая выборка: режет окна целого батча одной векторной операцией.
+        DataLoader использует этот метод, если он есть — на порядок меньше Python-
+        вызовов, чем 512 отдельных __getitem__. Семантически идентично __getitem__.
+        """
+        idx = np.asarray(indices, dtype=np.int64)
+        rows = idx[:, None] + np.arange(self.window, dtype=np.int64)[None, :]  # (B, window)
+        xb = self.X[rows]                                  # (B, window, n_features)
+        yb = self.y[idx + self.window].astype(np.int64)    # (B,)
+        xt = torch.from_numpy(xb)
+        yt = torch.from_numpy(yb)
+        return [(xt[i], yt[i]) for i in range(len(idx))]
 
 
 # =============================================================================
@@ -674,6 +735,7 @@ def fit_classifier_sharpe(
     periods_per_year: float = PER_YEAR_FWD,
     min_hold: int = 1,
     device=None,
+    history_out: Optional[list] = None,
 ) -> float:
     """Обучение с early stopping по val net-Sharpe на forward-return.
 
@@ -694,6 +756,9 @@ def fit_classifier_sharpe(
         periods_per_year -- число периодов в году для Sharpe.
         min_hold         -- минимальное удержание при оценке.
         device           -- torch.device; если None — авто-определение.
+        history_out      -- если передан list, в него по эпохам пишутся словари
+                            {epoch, train_loss, val_net_sharpe} (для learning curve
+                            в MLflow). Не ломает существующих вызовов.
 
     Возвращает:
         best_val_sharpe (float) -- лучший val net-Sharpe.
@@ -714,6 +779,10 @@ def fit_classifier_sharpe(
         val_sh = sharpe_ratio(
             net_returns(pos_aligned, fwd_s), periods_per_year
         )
+        if history_out is not None:
+            history_out.append(
+                {"epoch": ep, "train_loss": float(tl), "val_net_sharpe": float(val_sh)}
+            )
         print(
             f"[{tag}] {ep:02d}/{epochs} loss={tl:.4f} val_netSharpe={val_sh:.3f}"
         )
@@ -810,14 +879,29 @@ def meta_labels(primary_prob: np.ndarray, true_label: np.ndarray, thr: float = 0
     return acted, success
 
 
-def window_aggregates(ds: WindowDataset) -> np.ndarray:
+def window_aggregates(ds: WindowDataset, chunk: int = 50000) -> np.ndarray:
     """Агрегаты признаков окна: mean | std | last_step.
 
     Используется для формирования признаков вторичного классификатора.
-    Форма выхода: (N, 3 * n_features).
+    Форма выхода: (N, 3 * n_features). Считается через sliding_window_view
+    чанками (без материализации всех окон) — идентично прежней реализации
+    seq.mean(1)|seq.std(1)|seq[:,-1,:].
     """
-    seq = ds.sequences  # (N, T, F)
-    return np.concatenate([seq.mean(1), seq.std(1), seq[:, -1, :]], axis=1)
+    from numpy.lib.stride_tricks import sliding_window_view
+
+    X, w, n = ds.X, ds.window, ds.n
+    F = X.shape[1]
+    if n <= 0:
+        return np.empty((0, 3 * F), dtype=np.float32)
+    sw = sliding_window_view(X, w, axis=0)  # (len-w+1, F, w) — view, без копии
+    out = np.empty((n, 3 * F), dtype=np.float32)
+    for s in range(0, n, chunk):
+        e = min(s + chunk, n)
+        block = sw[s:e]                      # (e-s, F, w)
+        out[s:e, :F] = block.mean(axis=2)
+        out[s:e, F:2 * F] = block.std(axis=2)
+        out[s:e, 2 * F:] = block[:, :, -1]
+    return out
 
 
 # =============================================================================

@@ -1,0 +1,41 @@
+########## BTC 10:43:44 free=14G ##########
+=== BTC: читаю 1s (2.4 ГБ) ===
+BTC 1s: ROC=0.5721 Sh maker=-583.1 BH=0.02 (test=3525060) RAM=15.0ГБ
+BTC 5s: ROC=0.5917 Sh maker=-349.69 BH=0.06 (test=704964) RAM=15.0ГБ
+BTC 15s: ROC=0.582 Sh maker=-54.4 BH=0.08 (test=234948) RAM=15.0ГБ
+BTC 30s: ROC=0.5619 Sh maker=-34.8 BH=0.07 (test=117444) RAM=15.0ГБ
+[OK] BTC: дописано 4 строк -> sub_assets_results.csv (пик RAM 15.0ГБ)
+## BTC exit=0 ##
+########## ETH 10:58:03 free=14G ##########
+=== ETH: читаю 1s (2.2 ГБ) ===
+ETH 1s: ROC=0.5988 Sh maker=-6.4 BH=-0.74 (test=3525060) RAM=15.1ГБ
+ETH 5s: ROC=0.5684 Sh maker=-211.09 BH=-0.62 (test=704964) RAM=15.1ГБ
+ETH 15s: ROC=0.5358 Sh maker=-155.94 BH=-0.56 (test=234948) RAM=15.1ГБ
+ETH 30s: ROC=0.5158 Sh maker=1.81 BH=-0.58 (test=117444) RAM=15.1ГБ
+[OK] ETH: дописано 4 строк -> sub_assets_results.csv (пик RAM 15.1ГБ)
+## ETH exit=0 ##
+########## BNB 11:10:06 free=14G ##########
+=== BNB: читаю 1s (1.9 ГБ) ===
+BNB 1s: ROC=0.585 Sh maker=-2.33 BH=3.9 (test=3525060) RAM=15.0ГБ
+BNB 5s: ROC=0.5725 Sh maker=-183.08 BH=3.57 (test=704964) RAM=15.0ГБ
+BNB 15s: ROC=0.5475 Sh maker=-84.14 BH=3.39 (test=234948) RAM=15.0ГБ
+BNB 30s: ROC=0.5221 Sh maker=-39.36 BH=3.36 (test=117444) RAM=15.0ГБ
+[OK] BNB: дописано 4 строк -> sub_assets_results.csv (пик RAM 15.0ГБ)
+## BNB exit=0 ##
+########## SOL 11:22:30 free=14G ##########
+=== SOL: читаю 1s (2.0 ГБ) ===
+SOL 1s: ROC=0.5717 Sh maker=1.43 BH=1.43 (test=3525060) RAM=15.0ГБ
+SOL 5s: ROC=0.5519 Sh maker=-48.94 BH=1.38 (test=704964) RAM=15.0ГБ
+SOL 15s: ROC=0.5267 Sh maker=-18.65 BH=1.4 (test=234948) RAM=15.0ГБ
+SOL 30s: ROC=0.5142 Sh maker=-16.54 BH=1.38 (test=117444) RAM=15.0ГБ
+[OK] SOL: дописано 4 строк -> sub_assets_results.csv (пик RAM 15.0ГБ)
+## SOL exit=0 ##
+########## XRP 11:37:32 free=14G ##########
+=== XRP: читаю 1s (1.9 ГБ) ===
+XRP 1s: ROC=0.5964 Sh maker=-9.53 BH=-0.64 (test=3525060) RAM=15.0ГБ
+XRP 5s: ROC=0.5624 Sh maker=-127.69 BH=-0.53 (test=704964) RAM=15.0ГБ
+XRP 15s: ROC=0.5356 Sh maker=-33.18 BH=-0.48 (test=234948) RAM=15.0ГБ
+XRP 30s: ROC=0.5165 Sh maker=-15.17 BH=-0.47 (test=117444) RAM=15.0ГБ
+[OK] XRP: дописано 4 строк -> sub_assets_results.csv (пик RAM 15.0ГБ)
+## XRP exit=0 ##
+ALL DONE

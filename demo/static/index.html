@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Live Forecast Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --txt:#c9d1d9; --mut:#8b949e;
+          --grn:#3fb950; --red:#f85149; --acc:#1f6feb; }
+  body { background:var(--bg); color:var(--txt); font-family:ui-monospace,Menlo,Consolas,monospace;
+         margin:0; padding:18px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:var(--mut); font-size:13px; margin-bottom:12px; }
+  .badge { background:var(--panel); border:1px solid var(--line); border-radius:6px;
+           padding:2px 8px; margin-right:6px; }
+  #tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+  .tab { background:var(--panel); border:1px solid var(--line); border-radius:6px;
+         padding:6px 14px; cursor:pointer; font-size:13px; color:var(--mut); }
+  .tab.active { color:#fff; border-color:var(--acc); background:#1b2a4a; font-weight:700; }
+  table { width:100%; border-collapse:collapse; background:var(--panel);
+          border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  th,td { padding:9px 12px; text-align:right; border-bottom:1px solid var(--line); }
+  th:first-child,td:first-child { text-align:left; }
+  th { color:var(--mut); font-weight:600; font-size:12px; text-transform:uppercase; }
+  tr:last-child td { border-bottom:none; }
+  .pos { color:var(--grn); } .neg { color:var(--red); }
+  .sig-up { color:var(--grn); } .sig-dn { color:var(--red); } .sig-fl { color:var(--mut); }
+  .lead td { font-weight:700; }
+  #chart-wrap { margin-top:18px; background:var(--panel); border:1px solid var(--line);
+                border-radius:8px; padding:12px; height:300px; }
+  .err { color:var(--red); margin-top:10px; }
+</style>
+</head>
+<body>
+  <h1>Live Forecast Demo · <span id="symbol">—</span></h1>
+  <div class="sub">
+    <span class="badge" id="mode">—</span>
+    <span class="badge" id="tf">—</span>
+    <span class="badge">бар <span id="bar">0</span></span>
+    <span class="badge">цена <span id="price">—</span></span>
+    <span class="badge" id="ts">—</span>
+    <span style="color:var(--mut)">· бумажный учёт, реальных сделок нет</span>
+  </div>
+
+  <div id="tabs"></div>
+
+  <table>
+    <thead><tr>
+      <th>стратегия</th><th>прогноз→</th><th>позиция</th>
+      <th>PnL %</th><th>hit %</th><th>Sharpe</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div id="err" class="err"></div>
+
+  <div id="chart-wrap"><canvas id="chart"></canvas></div>
+
+<script>
+const SIG = {"1":["↑","sig-up"], "-1":["↓","sig-dn"], "0":["·","sig-fl"]};
+const POS = {"1":"LONG","-1":"SHORT","0":"FLAT"};
+const fmt = v => (v>0?"+":"") + v.toFixed(2);
+const colors = ["#58a6ff","#3fb950","#d29922","#f85149","#bc8cff","#39c5cf"];
+
+const state = {};      // sym -> { rows, meta, pts:{name:[{x,y}]} }
+let active = null, chart, chartDirty = false;
+
+function initChart(){
+  chart = new Chart(document.getElementById("chart"), {
+    type:"line", data:{datasets:[]},
+    options:{ responsive:true, maintainAspectRatio:false, animation:false, parsing:false,
+      scales:{ x:{ type:"linear", ticks:{color:"#8b949e",maxTicksLimit:8,callback:v=>"бар "+v},
+                   grid:{color:"#21262d"} },
+               y:{ ticks:{color:"#8b949e"}, grid:{color:"#21262d"},
+                   title:{display:true,text:"накопл. PnL %",color:"#8b949e"} } },
+      plugins:{ legend:{ labels:{color:"#c9d1d9", boxWidth:12} } } }
+  });
+}
+
+function colorFor(st, name){
+  if(!st._ci) st._ci = {};
+  if(!(name in st._ci)) st._ci[name] = colors[Object.keys(st._ci).length % colors.length];
+  return st._ci[name];
+}
+
+function ensureTab(sym){
+  if(document.getElementById("tab-"+sym)) return;
+  const b = document.createElement("div");
+  b.className = "tab"; b.id = "tab-"+sym;
+  b.textContent = sym.toUpperCase().replace("USDT","/USDT");
+  b.onclick = () => setActive(sym);
+  document.getElementById("tabs").appendChild(b);
+  if(active === null) setActive(sym);
+}
+
+function setActive(sym){
+  active = sym;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.id==="tab-"+sym));
+  // перестроить график из сохранённых точек
+  const st = state[sym];
+  chart.data.datasets = [];
+  if(st){ for(const name in st.pts){
+      const c = colorFor(st, name);
+      chart.data.datasets.push({label:name, data:st.pts[name].slice(), borderColor:c,
+        backgroundColor:c, borderWidth:1.6, pointRadius:0, tension:0.1});
+  }}
+  chart.update();
+  if(st) renderTable(st);
+}
+
+function renderTable(st){
+  document.getElementById("symbol").textContent = active.toUpperCase().replace("USDT","/USDT");
+  const m = st.meta || {};
+  document.getElementById("mode").textContent = m.mode||"—";
+  document.getElementById("tf").textContent = m.tf||"—";
+  document.getElementById("bar").textContent = m.bar||0;
+  document.getElementById("price").textContent = m.price?m.price.toLocaleString("ru-RU",{maximumFractionDigits:2}):"—";
+  document.getElementById("ts").textContent = (m.ts||"").replace("T"," ").slice(0,19);
+  const tb = document.getElementById("rows"); tb.innerHTML = "";
+  (st.rows||[]).forEach((r,i)=>{
+    const [arr,cls] = SIG[String(r.signal)];
+    const tr = document.createElement("tr"); if(i===0) tr.className="lead";
+    tr.innerHTML = `<td>${r.name}</td><td class="${cls}">${arr}</td><td>${POS[String(r.position)]}</td>
+      <td class="${r.pnl_pct>=0?'pos':'neg'}">${fmt(r.pnl_pct)}</td>
+      <td>${r.hit_pct===null?"—":r.hit_pct.toFixed(1)}</td>
+      <td class="${r.sharpe>=0?'pos':'neg'}">${fmt(r.sharpe)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function onSnap(snap){
+  if(snap.error){ document.getElementById("err").textContent = "Ошибка: "+snap.error; return; }
+  const sym = snap.symbol;
+  if(!state[sym]) state[sym] = { rows:[], meta:{}, pts:{} };
+  const st = state[sym];
+  st.rows = snap.rows;
+  st.meta = {bar:snap.bar, price:snap.price, ts:snap.ts, mode:snap.mode, tf:snap.tf};
+  snap.rows.forEach(r=>{ (st.pts[r.name] = st.pts[r.name] || []).push({x:snap.bar, y:r.pnl_pct}); });
+  ensureTab(sym);
+  if(sym === active){
+    renderTable(st);
+    // дорисовать новые точки в активный график
+    snap.rows.forEach(r=>{
+      let ds = chart.data.datasets.find(d=>d.label===r.name);
+      if(!ds){ const c=colorFor(st,r.name);
+        ds = {label:r.name, data:[], borderColor:c, backgroundColor:c, borderWidth:1.6, pointRadius:0, tension:0.1};
+        chart.data.datasets.push(ds); }
+      ds.data.push({x:snap.bar, y:r.pnl_pct});
+    });
+    chartDirty = true;
+  }
+}
+
+initChart();
+setInterval(()=>{ if(chartDirty){ chart.update(); chartDirty=false; } }, 250);
+const es = new EventSource("/stream");
+es.onmessage = e => onSnap(JSON.parse(e.data));
+es.onerror = () => { document.getElementById("err").textContent = "Поток прерван — переподключение…"; };
+</script>
+</body>
+</html>

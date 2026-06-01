@@ -1,11 +1,14 @@
-# Зависимости проекта CP7: MLflow + MinIO/S3 + DL + ML + данные
-mlflow
-torch
-scikit-learn
+# Зависимости проекта CP7: MLflow + MinIO/S3 + DL + ML + данные.
+# Версии запинены для воспроизводимости (требование чекпоинта 7).
+# torch без локального тега +cpu: с PyPI ставится сборка под платформу;
+# для CPU-only можно: pip install torch==2.12.0 --index-url https://download.pytorch.org/whl/cpu
+mlflow==3.13.0
+torch==2.12.0
+scikit-learn==1.9.0
 pandas==2.3.3
-numpy
-boto3
-hydra-core
-omegaconf
-matplotlib
-pyarrow
+numpy==2.4.6
+boto3==1.43.28
+hydra-core==1.3.3
+omegaconf==2.3.1
+matplotlib==3.11.0
+pyarrow==24.0.0

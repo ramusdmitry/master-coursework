@@ -33,6 +33,7 @@ from src.common import (
     ACTIVE_ASSET,
     SEED,
     make_synthetic_splits,
+    resolve_tracking_uri,
     set_seed,
 )
 
@@ -152,7 +153,9 @@ def main(cfg: DictConfig) -> None:
     """
     set_seed(cfg.seed)
 
-    tracking_uri = cfg.mlflow.get("tracking_uri", "http://localhost:5000")
+    tracking_uri = resolve_tracking_uri(
+        cfg.mlflow.get("tracking_uri", "http://localhost:5000")
+    )
     mlflow.set_tracking_uri(tracking_uri)
 
     registered_model_name = cfg.mlflow.registered_model_name

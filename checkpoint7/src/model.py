@@ -140,6 +140,8 @@ class MetaLabelingModel:
         self.meta_threshold: float = 0.5
         self.best_min_hold: int = min_holding
         self.best_val_sharpe: float = -1e18
+        # История обучения primary по эпохам (для learning curve в MLflow)
+        self.train_history: list = []
 
     # ------------------------------------------------------------------
     # Обучение
@@ -205,6 +207,7 @@ class MetaLabelingModel:
         optimizer = optim.Adam(self.primary.parameters(), lr=self.lr)
 
         print("Обучение primary SimpleLSTM (early stopping по val net-Sharpe)...")
+        self.train_history = []
         self.best_val_sharpe = fit_classifier_sharpe(
             self.primary,
             ld_tr,
@@ -219,6 +222,7 @@ class MetaLabelingModel:
             periods_per_year=self.periods_per_year,
             min_hold=self.min_holding,
             device=self.device,
+            history_out=self.train_history,
         )
 
         # Предсказания primary на train/val

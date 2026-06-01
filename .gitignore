@@ -12,9 +12,31 @@ ENV/
 *.sqlite3
 .env
 ml_service.db
-models/
+# Якорим к корню репозитория: иначе паттерны поглощают исходники
+# pipeline/src/data, pipeline/src/models, checkpoint7/conf/data и т.п.
+/models/
 *.pth
 *.pkl
 idea/
-data/
+/data/
 .idea/
+
+# Но НЕ игнорируем каталоги исходного кода с именами data/ и models/
+# (только сами файлы, не __pycache__ — он остаётся под общим правилом выше)
+!pipeline/src/data/
+!pipeline/src/data/*.py
+!pipeline/src/models/
+!pipeline/src/models/*.py
+!checkpoint7/conf/data/
+!checkpoint7/conf/data/*.yaml
+
+# Артефакты прогонов MLflow / Hydra (не версионируем)
+mlruns/
+mlartifacts/
+outputs/
+multirun/
+
+# mlflow (генерируется mlflow_log.py)
+checkpoint7/mlflow.db
+checkpoint7/mlruns/
+mlruns/

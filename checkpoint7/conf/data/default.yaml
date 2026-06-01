@@ -1,0 +1,27 @@
+# Конфиг данных для CP7 (Meta-Labeling).
+# @package _global_.data
+#
+# Указывает, откуда брать хронологические сплиты проекта и какой актив торгуем.
+# Если parquet-файлы не найдены ИЛИ synthetic=true — пайплайн переходит на
+# воспроизводимую синтетику (make_synthetic_splits), чтобы всё запускалось
+# без реальных данных (для проверки логики/демонстрации).
+
+# Актив (используется как префикс признаков BTC__ и в таргетах (BTC, y_bin/y_reg)).
+active_asset: BTC
+
+# Каталог с хронологическими сплитами (относительно корня checkpoint7/).
+# Благодаря hydra.job.chdir=false (см. conf/config.yaml) путь резолвится
+# от текущего рабочего каталога запуска, а не от output-папки Hydra.
+data_dir: data/processed
+
+# Принудительно использовать синтетические данные (для теста пайплайна).
+synthetic: false
+
+# Имена файлов сплитов внутри data_dir.
+splits:
+  X_train: X_train.parquet
+  X_val: X_val.parquet
+  X_test: X_test.parquet
+  y_train: y_train.parquet
+  y_val: y_val.parquet
+  y_test: y_test.parquet

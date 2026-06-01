@@ -59,6 +59,7 @@ from src.common import (
     load_splits,
     make_synthetic_splits,
     meta_labels,
+    resolve_tracking_uri,
     resolve_y_column,
     set_seed,
     triple_barrier_labels,
@@ -176,10 +177,18 @@ def _prepare_data(cfg: DictConfig):
     fwd_va = fwd_va_full.reindex(idx_va_w).fillna(0.0)
     fwd_te = fwd_te_full.reindex(idx_te_w).fillna(0.0)
 
+    # 1-барная forward-доходность (БЕЗ перекрытия) — для корректной торговой оценки.
+    # forward_return(s, 1)[t] = s[t+1]; оценка pos*r1 не двойно-считает доходности
+    # при удержании позиции (исправление бага overlapping forward-return).
+    r1_tr = forward_return(s_tr, 1).reindex(idx_tr_w).fillna(0.0)
+    r1_va = forward_return(s_va, 1).reindex(idx_va_w).fillna(0.0)
+    r1_te = forward_return(s_te, 1).reindex(idx_te_w).fillna(0.0)
+
     return {
         "Xt_s": Xt_s, "Xv_s": Xv_s, "Xte_s": Xte_s,
         "yt_tb": yt_tb, "yv_tb": yv_tb, "yte_tb": yte_tb,
         "fwd_tr": fwd_tr, "fwd_va": fwd_va, "fwd_te": fwd_te,
+        "r1_tr": r1_tr, "r1_va": r1_va, "r1_te": r1_te,
         "idx_tr_w": idx_tr_w, "idx_va_w": idx_va_w, "idx_te_w": idx_te_w,
         "n_features": n_features,
         "scaler": scaler,
@@ -206,15 +215,40 @@ def _log_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, artifact_dir: 
 
 
 def _log_learning_curve(history: list, artifact_dir: Path) -> Path:
-    """Строит кривую обучения (val net-Sharpe по эпохам) и сохраняет в файл."""
+    """Строит кривую обучения primary-модели по эпохам и сохраняет в файл.
+
+    history — список словарей {epoch, train_loss, val_net_sharpe}
+    (собирается fit_classifier_sharpe через history_out). Рисуем две оси:
+    train loss (левая) и val net-Sharpe (правая).
+    """
     fig, ax = plt.subplots(figsize=(8, 4))
     if history:
-        ax.plot(range(1, len(history) + 1), history, color="#20808D", linewidth=2)
-        ax.axhline(0, color="#A84B2F", linestyle="--", linewidth=0.8, label="Sharpe=0")
+        epochs = [h["epoch"] for h in history]
+        losses = [h["train_loss"] for h in history]
+        sharpes = [h["val_net_sharpe"] for h in history]
+
+        ax.plot(epochs, losses, color="#A84B2F", linewidth=2, label="train loss")
+        ax.set_ylabel("Train loss", color="#A84B2F")
+        ax.tick_params(axis="y", labelcolor="#A84B2F")
+
+        ax2 = ax.twinx()
+        ax2.plot(epochs, sharpes, color="#20808D", linewidth=2, label="val net-Sharpe")
+        ax2.axhline(0, color="#888888", linestyle="--", linewidth=0.8)
+        ax2.set_ylabel("Val net-Sharpe", color="#20808D")
+        ax2.tick_params(axis="y", labelcolor="#20808D")
+
+        # отмечаем лучшую эпоху (по которой выбран early stopping)
+        best_i = int(np.argmax(sharpes))
+        ax2.scatter([epochs[best_i]], [sharpes[best_i]], color="#20808D", zorder=5)
+        ax2.annotate(
+            f"best ep={epochs[best_i]}",
+            (epochs[best_i], sharpes[best_i]),
+            textcoords="offset points", xytext=(5, 5), fontsize=8,
+        )
+    else:
+        ax.text(0.5, 0.5, "Нет истории обучения", ha="center", va="center")
     ax.set_xlabel("Эпоха")
-    ax.set_ylabel("Val net-Sharpe")
     ax.set_title("Кривая обучения primary-модели (early stopping по val net-Sharpe)")
-    ax.legend()
     plt.tight_layout()
     path = artifact_dir / "learning_curve.png"
     fig.savefig(path, dpi=120, bbox_inches="tight")
@@ -272,8 +306,10 @@ def main(cfg: DictConfig) -> None:
     print("=== CP7: Обучение Meta-Labeling ===")
     print(OmegaConf.to_yaml(cfg))
 
-    # Настройка MLflow
-    tracking_uri = cfg.mlflow.get("tracking_uri", "http://localhost:5000")
+    # Настройка MLflow (с graceful-fallback на локальный sqlite, если сервер не поднят)
+    tracking_uri = resolve_tracking_uri(
+        cfg.mlflow.get("tracking_uri", "http://localhost:5000")
+    )
     mlflow.set_tracking_uri(tracking_uri)
     experiment_name = cfg.mlflow.get("experiment_name", "crypto_meta_labeling_cp7")
     mlflow.set_experiment(experiment_name)
@@ -384,9 +420,13 @@ def main(cfg: DictConfig) -> None:
             except Exception as e:
                 print(f"Предупреждение: не удалось создать confusion_matrix: {e}")
 
-            # 2. Кривая обучения (placeholder — история эпох не собирается в текущей реализации)
-            lc_path = _log_learning_curve([], tmp_path)
+            # 2. Кривая обучения (реальная история по эпохам primary-модели)
+            lc_path = _log_learning_curve(model.train_history, tmp_path)
             mlflow.log_artifact(str(lc_path))
+            # Per-epoch метрики как step-серии (видно в MLflow UI)
+            for h in model.train_history:
+                mlflow.log_metric("epoch_train_loss", h["train_loss"], step=h["epoch"])
+                mlflow.log_metric("epoch_val_net_sharpe", h["val_net_sharpe"], step=h["epoch"])
 
             # 3. Примеры предсказаний
             try:
@@ -422,11 +462,11 @@ def main(cfg: DictConfig) -> None:
                 artifacts=artifacts,
                 registered_model_name=registered_model_name,
                 pip_requirements=[
-                    "mlflow",
-                    "torch",
-                    "scikit-learn",
-                    "pandas",
-                    "numpy",
+                    "mlflow==3.13.0",
+                    "torch==2.12.0",
+                    "scikit-learn==1.9.0",
+                    "pandas==2.3.3",
+                    "numpy==2.4.6",
                 ],
             )
             print(f"Модель зарегистрирована: {registered_model_name}")
